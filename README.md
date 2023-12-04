@@ -220,7 +220,7 @@ const onVertexDrag = useCallback(
 <br />
 각 case에 해당하는 꼭지점의 순서는 다음과 같습니다.
 <br />
-<img width="200" alt="image" src="https://github.com/team-dtrio/peach-pitch-client/assets/80331804/defcfe55-f66c-426f-af98-f6070f76b0d0">
+<img width="150" alt="image" src="https://github.com/team-dtrio/peach-pitch-client/assets/80331804/defcfe55-f66c-426f-af98-f6070f76b0d0">
 
 예를 들어 `case 0`을 움직이는 경우, `case 4`에 해당하는 반대편 꼭지점은 움직이지 않고 리사이징 되어야 사용자 경험을 높일 수 있습니다.
 
@@ -437,12 +437,6 @@ const StyledTriangle = styled.div`
 
 contentEditable 요소에서 텍스트를 편집할 때, 커서가 예기치 않게 이동하는 것을 커서 점프라고 합니다. innerText 속성을 사용하면, DOM이 변경될 때마다 브라우저가 텍스트 노드를 다시 구성하고 렌더링합니다. 이 과정에서 커서 위치는 텍스트 내에서의 상대적 위치를 유지하게 됩니다. 이렇게 DOM 텍스트를 사용하는 방법으로 사용자가 입력하는 동안 커서가 예기치 않게 이동하는 문제를 해결할 수 있었습니다.
 
-innerText 속성을 사용하면, 사용자가 텍스트를 입력할 때마다 (DOM이 변경될 때마다) 브라우저가 텍스트 노드를 다시 구성하고 렌더링을 합니다. 이 과정에서 DOM이 새로운 텍스트 내용에 맞춰 업데이트됩니다.
-
-커서 위치 유지: innerText를 사용하면, 브라우저가 DOM을 재구성하는 과정에서도 커서의 상대적 위치를 유지할 수 있습니다. 즉, 텍스트 내에서 커서의 위치가 변경되지 않도록 관리됩니다.
-
-텍스트 노드 재렌더링: 커서의 위치가 텍스트 내에서 유지되기 때문에, 사용자가 입력을 계속할 때 커서가 예기치 않게 점프하는 문제를 방지할 수 있습니다.
-
 2.줄 바꿈 처리
 
 HTML 내에서 줄 바꿈은 보통 `<br>` 태그 등으로 표현됩니다. innerText는 이러한 HTML 구조를 일반 텍스트로 변환할 때 자동으로 적절한 줄 바꿈 문자(예: \n)로 치환합니다. 이를 통해 contentEditable 요소 내의 텍스트가 프로그램적으로 처리될 때 줄 바꿈이 유지됩니다.
@@ -461,13 +455,105 @@ innerText 속성을 사용해서 내용을 업데이트 하면, 레이아웃에 
 
 ### 2-2. 슬라이드, 미리보기, 재생 모드 동기화하기
 
-> ppt 슬라이드 모드, 슬라이드 미리보기 모드, 슬라이드 쇼 재생모드로 총 3가지의 모드에서 모두 도형 개체가 보여집니다. 이 들에서 모두 동일한 위치와 비율로 도형 개체가 렌더링 되어야합니다.
-> <br />
-> 이를 위해서 DB에 저장된 개체들의 위치와 크기를 이용해서 각 개체의 상대적인 위치를 퍼센트를 기반으로 계산하여 구현했습니다.
-
 **1) 각 모드에서 도형 개체를 동일한 위치와 비율로 렌더링 하기**
+ppt 슬라이드 모드, 슬라이드 미리보기 모드, 슬라이드 쇼 재생모드로 총 3가지의 모드에서 모두 도형 개체가 보여집니다. 이 들에서 모두 동일한 위치와 비율로 도형 개체가 렌더링 되어야합니다.
+<br />
+
+이를 위해서 DB에 저장된 개체들의 위치와 크기를 이용해서 각 개체의 상대적인 위치를 퍼센트를 기반으로 계산하여 구현했습니다.
+
+```javascript
+const BaseComponent = styled.div`
+  position: absolute;
+  left: ${({ spec }) => (spec.x / 900) * 100}%;
+  top: ${({ spec }) => (spec.y / 600) * 100}%;
+  width: ${({ spec }) => (spec.width / 900) * 100}%;
+  height: ${({ spec }) => (spec.height / 600) * 100}%;
+  background-color: ${({ spec }) =>
+    spec.type.toLowerCase() === "textbox" ? "transparent" : spec.fillColor};
+  border: 1px solid ${({ spec }) => spec.borderColor};
+  text-align: ${({ spec }) => spec.textAlign};
+  animation: ${({ spec }) => animations[spec.currentAnimation]} 2s linear;
+  user-select: none;
+  box-sizing: border-box;
+  ${({ isActive }) =>
+    isActive === undefined &&
+    css`
+      animation-duration: 0s;
+    `}
+  ${({ isActive }) =>
+    isActive
+      ? css`
+          animation-play-state: running;
+        `
+      : css`
+          animation-play-state: paused;
+        `};
+`;
+```
+
+- 상대적 위치 계산
+
+  BaseComponent 스타일 컴포넌트에서 left와 top 속성이 (spec.x / 900) _ 100%와 (spec.y / 600) _ 100%로 계산되어있습니다. 도형의 x, y 좌표가 캔버스 크기에 상대적인 위치로 설정됩니다.
+
+- 상대적 크기 계산
+
+  BaseComponent에서 width와 height 속성이 (spec.width / 900) _ 100%와 (spec.height / 600) _ 100%로 계산되어 있습니다. 도형의 크기도 캔버스 크기에 상대적인 비율로 설정됩니다.
+
+이렇게 각 도형 개체의 기본 컴포넌트를 설정하고, spec을 사용해서 도형의 위치와 크기를 비율(퍼센트)로 나누는 방식을 사용해서 ppt 슬라이드, 미리보기, 슬라이드 재생 컴포넌트에서 도형이 동일한 위치와 크기로 랜더링 될 수 있습니다. 절대적인 값이 아닌 비율로 표현하기 떄문에 세가지 다양한 화면 크기에서도 동일하고 일관된 비율로 보이게 할 수 있기 때문입니다.
 
 **2) 각 모드에서 사용자의 제어 권한 다르게 하기**
+
+이렇게 모든 개체가 각 모드에서 동일한 비율로 표현되도록 했습니다. 하지만 ppt 슬라이드 모드에서는 도형 개체가 편집, 이동이 가능해야 합니다. 반면에 미리보기 모드와 재생 모드에서는 편집이 불가능해야합니다.
+
+이를 구현하기 위해서 미리보기와 재생모드에서는 편집 기능을 제한했습니다.
+이 두가지 모드에서는 NonEditableObject라는 컴포넌트를 사용해 도형을 렌더링 하는데, 편집과 관련된 props(contentEditable, onContextMenu)을 받지 않거나 이런 props를 사용하여 편집기능을 활성화하지 않습니다.
+
+그리고 사용자의 인터렉션 (클릭, 드래그 등)을 무시하는 방법으로 편집 기능을 제한합니다.
+
+<details>
+<summary>NonEditableObject 컴포넌트 코드</summary>
+
+```
+function NonEditableObject({ objectSpec, isAnimationActive, isThumbnail }) {
+  const components = {
+    Square,
+    Triangle,
+    Circle,
+    Image,
+  };
+  const Tag = components[objectSpec.type] || "div";
+
+  switch (objectSpec.type.toLowerCase()) {
+    case "textbox":
+      return (
+        <BaseComponent spec={objectSpec} isActive={isAnimationActive}>
+          <TextBox
+            spec={objectSpec}
+            isThumbnail={isThumbnail}
+            contentEditable
+            suppressContentEditableWarning
+          >
+            {objectSpec.content}
+          </TextBox>
+        </BaseComponent>
+      );
+    case "image":
+      return (
+        <BaseComponent spec={objectSpec} isActive={isAnimationActive}>
+          <Image src={objectSpec.imageUrl} spec={objectSpec} alt="image" />
+        </BaseComponent>
+      );
+    default:
+      return <Tag spec={objectSpec} isActive={isAnimationActive} />;
+  }
+}
+
+export default NonEditableObject;
+
+```
+
+</details>
+미리보기 모드와 슬라이드 쇼 재생 모드일 때 편집이 불가능 하도록 사용자가 편집할 수 있는 기능을 비활성화 시켜둔 컴포넌트를 활용했습니다. 미리보기와 재생 모드의 역할을 수행할 수 있도록 isThumbnail로 미리보기 모드인지를 확인하고, isActive로 슬라이드 쇼 재생 여부를 확인합니다.
 
 ### 2-3. ppt 애니메이션을 순수 CSS(@keyframes)로 구현하기
 
